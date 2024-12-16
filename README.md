@@ -1,102 +1,138 @@
-# Telegram Channel Scheduler Bot
+# Telegram Channel Repost Bot
 
-A Docker-containerized Telegram bot that helps manage media content scheduling in Telegram channels. The bot automatically schedules posts at regular intervals, removes forwarding metadata, and maintains a smart posting queue.
+A simple Telegram bot that allows authorized administrators to repost media content to a specific channel. Built with Python and aiogram.
 
 ## Features
 
-- **Smart Scheduling**: 
-  - Posts immediately if queue is empty
-  - Schedules to next half-hour slot if queue exists
-  - Maintains posting schedule from 06:00 to 01:00 next day
-  - Automatically adjusts scheduling to maintain consistent intervals
-
-- **Media Support**:
+- Multi-admin support with authorization system
+- Support for various media types:
   - Photos
   - Videos
   - GIFs/Animations
-
-- **Authorization System**:
-  - Multi-admin support
-  - JSON-based persistent storage
-  - Admin management commands
-
-- **Clean Content**:
-  - Automatically removes forwarding metadata
-  - Strips captions and other message attributes
+- Admin management commands
+- Main admin notifications about others' activities
+- Clean reposts (no forwarding metadata)
 
 ## Prerequisites
 
-- Docker and Docker Compose
-- Telegram Bot Token (from [@BotFather](https://t.me/BotFather))
+- Docker and Docker Compose (for Docker installation)
+- OR Python 3.11+ (for manual installation)
+- Telegram Bot Token from [@BotFather](https://t.me/BotFather)
 - Channel administrator rights for your bot
-- Python 3.11+ (if running without Docker)
 
-## Quick Start
+## Installation
+
+### Using Docker (recommended)
 
 1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/telegram-channel-scheduler-bot.git
-   cd telegram-channel-scheduler-bot
-   ```
+```bash
+git clone https://github.com/TurboKach/telegram-channel-repost-bot.git
+cd telegram-channel-repost-bot
+```
 
 2. Create `.env` file:
-   ```env
-   BOT_TOKEN=your_bot_token
-   CHANNEL_ID=your_channel_id
-   MAIN_ADMIN_ID=your_admin_id
-   TIMEZONE=UTC
-   ```
+```env
+BOT_TOKEN=your_bot_token
+CHANNEL_ID=your_channel_id
+MAIN_ADMIN_ID=your_user_id
+TIMEZONE=UTC
+```
 
 3. Run with Docker Compose:
-   ```bash
-   docker-compose up -d
-   ```
+```bash
+docker-compose up -d
+```
 
-## Environment Variables
+### Manual Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/telegram-channel-repost-bot.git
+cd telegram-channel-repost-bot
+```
+
+2. Install requirements:
+```bash
+pip install -r requirements.txt
+```
+
+3. Create `.env` file as shown above
+
+4. Run the bot:
+```bash
+python bot.py
+```
+
+## Configuration
 
 - `BOT_TOKEN`: Your Telegram bot token
 - `CHANNEL_ID`: ID of your Telegram channel (with minus sign if it's public)
 - `MAIN_ADMIN_ID`: Telegram user ID of the main administrator
-- `TIMEZONE`: Timezone for scheduling (default: UTC)
+- `TIMEZONE`: Your timezone (default: UTC)
 
-## Admin Commands
+## Commands
 
-- `/add_admin USER_ID` - Add new administrator (main admin only)
-- `/remove_admin USER_ID` - Remove administrator (main admin only)
+### Main Admin Commands
+- `/add_admin USER_ID` - Add new administrator
+- `/remove_admin USER_ID` - Remove administrator
 - `/list_admins` - Show list of authorized administrators
+- `/last_post` - Check when the last post was made
+- `/help` - Show help message
+
+### Regular Admin Commands
+- `/last_post` - Check when the last post was made
+- `/help` - Show help message
 
 ## Usage
 
 1. Add the bot as administrator to your channel
-2. Forward or send media files (photos, videos, GIFs) to the bot
-3. Bot will either:
-   - Post immediately if no queue and within allowed hours (06:00-01:00)
-   - Schedule to next available half-hour slot
-4. Bot will confirm scheduling with timestamp
+2. Send or forward media (photos, videos, GIFs) to the bot
+3. Bot will post the media to your channel immediately
+4. Main admin will receive notifications about other admins' posts
 
-## Development
-
-### Running without Docker
-
-1. Install requirements:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-2. Run the bot:
-   ```bash
-   python bot.py
-   ```
-
-### Project Structure
+## File Structure
 ```
 .
-├── bot.py              # Main bot logic
+├── bot.py              # Main bot code
 ├── requirements.txt    # Python dependencies
 ├── Dockerfile         # Docker configuration
 ├── docker-compose.yml # Docker Compose configuration
-├── admins.json        # Persistent storage for admins
-└── .env              # Environment variables
+├── .env               # Environment variables
+└── admins.json        # Admins storage
+```
+
+## Dependencies
+
+- aiogram==3.15.0
+- python-dotenv==1.0.0
+- pytz==2024.1
+
+## Docker Volumes
+
+The bot uses a persistent volume for `admins.json` to maintain the list of authorized administrators across container restarts.
+
+## Docker Commands
+
+Start the bot:
+```bash
+docker-compose up -d
+```
+
+View logs:
+```bash
+docker-compose logs -f
+```
+
+Stop the bot:
+```bash
+docker-compose down
+```
+
+Update the bot:
+```bash
+docker-compose pull  # If using prebuilt image
+# or
+docker-compose up -d --build  # If building locally
 ```
 
 ## Contributing
@@ -110,12 +146,3 @@ A Docker-containerized Telegram bot that helps manage media content scheduling i
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- [aiogram](https://github.com/aiogram/aiogram) - Telegram Bot framework
-- [python-telegram-bot](https://python-telegram-bot.org/) - Telegram Bot API wrapper
-
-## Contact
-
-Project Link: [https://github.com/TurboKach/telegram-channel-scheduler-bot.git](https://github.com/TurboKach/telegram-channel-scheduler-bot.git)
