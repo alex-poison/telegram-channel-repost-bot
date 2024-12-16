@@ -1,0 +1,9 @@
+version: '3.8'
+services:
+  bot:
+    build: .
+    volumes:
+      - ./admins.json:/app/admins.json
+    env_file:
+      - .env
+    restart: always
