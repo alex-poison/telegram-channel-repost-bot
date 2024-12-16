@@ -64,6 +64,15 @@ post_tracker = PostTracker()
 
 def load_admins() -> dict[int, str]:
     """Load admins with their usernames, migrate from old format if needed"""
+    os.makedirs(DATA_DIR, exist_ok=True)
+
+    if not os.path.exists(ADMINS_FILE):
+        # Create default empty admins file
+        f: TextIOWrapper
+        with open(ADMINS_FILE, 'w', encoding='utf-8') as f:
+            json.dump({'authorized_users': {}}, f, ensure_ascii=False)
+        return {}
+
     try:
         with open(ADMINS_FILE, 'r', encoding='utf-8') as f:
             data = json.load(f)
@@ -79,7 +88,8 @@ def load_admins() -> dict[int, str]:
 
             # Handle new format (dict with usernames)
             return {int(id_): username for id_, username in data.get('authorized_users', {}).items()}
-    except FileNotFoundError:
+    except Exception as e:
+        logger.error(f"Error loading admins: {e}")
         return {}
 
 
@@ -363,7 +373,6 @@ async def main():
 
     except Exception as e:
         logger.error(f"Error in main: {e}")
-
 
 if __name__ == '__main__':
     asyncio.run(main())
