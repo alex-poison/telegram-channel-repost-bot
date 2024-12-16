@@ -12,13 +12,16 @@ from typing import Optional
 from io import TextIOWrapper
 
 
-
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+DATA_DIR = "data"
+os.makedirs(DATA_DIR, exist_ok=True)
+ADMINS_FILE = os.path.join(DATA_DIR, "admins.json")
 
 # Load environment variables
 load_dotenv()
@@ -62,7 +65,7 @@ post_tracker = PostTracker()
 def load_admins() -> dict[int, str]:
     """Load admins with their usernames, migrate from old format if needed"""
     try:
-        with open('admins.json', 'r', encoding='utf-8') as f:
+        with open(ADMINS_FILE, 'r', encoding='utf-8') as f:
             data = json.load(f)
 
             # Handle old format (list of ids)
@@ -82,8 +85,9 @@ def load_admins() -> dict[int, str]:
 
 def save_admins(admins: dict[int, str]) -> None:
     """Save admins with their usernames"""
+    os.makedirs(DATA_DIR, exist_ok=True)
     f: TextIOWrapper
-    with open('admins.json', 'w', encoding='utf-8') as f:
+    with open(ADMINS_FILE, 'w', encoding='utf-8') as f:
         json_data = {'authorized_users': {str(k): v for k, v in admins.items()}}
         json.dump(json_data, f, ensure_ascii=False)
 

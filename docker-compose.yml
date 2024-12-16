@@ -3,7 +3,7 @@ services:
   bot:
     build: .
     volumes:
-      - ./admins.json:/app/admins.json
+      - ./data:/app/data
     env_file:
       - .env
     restart: always
