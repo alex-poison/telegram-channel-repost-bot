@@ -43,6 +43,16 @@ REGULAR_ADMIN_COMMANDS = [
     BotCommand(command="help", description="Show help message")
 ]
 
+ALLOWED_MEDIA_TYPES = [
+    types.ContentType.PHOTO,
+    types.ContentType.AUDIO,
+    types.ContentType.VIDEO,
+    types.ContentType.ANIMATION,
+    types.ContentType.DOCUMENT,
+    types.ContentType.VOICE,
+    types.ContentType.VIDEO_NOTE,
+]
+
 
 # Initialize bot and dispatcher
 bot = Bot(token=BOT_TOKEN)
@@ -311,8 +321,23 @@ async def handle_media(message: Message):
     elif message.animation:
         media = message.animation
         media_type = "animation"
+    elif message.video:
+        media = message.video
+        media_type = "video"
+    elif message.video_note:
+        media = message.video_note
+        media_type = "video_note"
+    elif message.audio:
+        media = message.audio
+        media_type = "audio"
+    elif message.voice:
+        media = message.voice
+        media_type = "voice"
+    elif message.document:
+        media = message.document
+        media_type = "document"
     else:
-        await message.reply("Please send a photo, video, or GIF.")
+        await message.reply(f"Please send a message of following types: {ALLOWED_MEDIA_TYPES}")
         return
 
     try:
@@ -329,6 +354,17 @@ async def handle_media(message: Message):
             await bot.send_video(chat_id=CHANNEL_ID, video=media.file_id)
         elif media_type == "animation":
             await bot.send_animation(chat_id=CHANNEL_ID, animation=media.file_id)
+        elif media_type == "video_note":
+            await bot.send_video_note(chat_id=CHANNEL_ID, video_note=media.file_id)
+        elif media_type == "voice":
+            await bot.send_voice(chat_id=CHANNEL_ID, voice=media.file_id)
+        elif media_type == "audio":
+            await bot.send_audio(chat_id=CHANNEL_ID, audio=media.file_id)
+        elif media_type == "document":
+            await bot.send_document(chat_id=CHANNEL_ID, document=media.file_id)
+        elif media_type == "animation":
+            await bot.send_animation(chat_id=CHANNEL_ID, animation=media.file_id)
+
 
         post_tracker.update_last_post_time(datetime.now(TIMEZONE))
         await message.reply("Message posted successfully.")
