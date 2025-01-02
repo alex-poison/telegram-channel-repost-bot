@@ -120,60 +120,43 @@ def process_image(image_bytes, watermark_text, opacity, text_width_ratio, shadow
     watermark = Image.new('RGBA', img_copy.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(watermark)
 
-    # Calculate desired width of text
-    desired_text_width = int(img_copy.width * text_width_ratio)
+    # Calculate base font size from image dimensions
+    base_font_size = int(min(img_copy.width, img_copy.height) / 15)  # Changed this line
+    logger.info(f"Base font size: {base_font_size} for image {img_copy.width}x{img_copy.height}")
 
-    # Test available fonts
-    available_font = None
+    # Available fonts
     font_paths = [
-        # Ubuntu Liberation fonts
         '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
         '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
-        # Fallbacks (though we shouldn't need them in your case)
-        '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
-        '/usr/share/fonts/truetype/ubuntu/Ubuntu-Bold.ttf',
-        '/System/Library/Fonts/Helvetica.ttc',
-        'C:\\Windows\\Fonts\\arial.ttf',
     ]
 
-    # Find first available font
+    # Find first available font with proper size
+    available_font = None
+    font = None
+
     for font_path in font_paths:
         try:
-            test_font = ImageFont.truetype(font_path, size=20)
+            font = ImageFont.truetype(font_path, size=base_font_size)
             available_font = font_path
-            logger.info(f"Successfully loaded font: {font_path}")
+            logger.info(f"Using font: {font_path} with size {base_font_size}")
             break
         except Exception as e:
             logger.debug(f"Failed to load font {font_path}: {str(e)}")
             continue
 
     if not available_font:
-        default_font = ImageFont.load_default()
-        bbox = draw.textbbox((0, 0), watermark_text, font=default_font)
-        text_width = bbox[2] - bbox[0]
-        scale_factor = desired_text_width / text_width
-        font = default_font
-    else:
-        # Start with a reasonable size and measure
-        test_size = 100
-        font = ImageFont.truetype(available_font, size=test_size)
-        bbox = draw.textbbox((0, 0), watermark_text, font=font)
-        test_width = bbox[2] - bbox[0]
+        logger.warning("No TrueType fonts found, using default font")
+        font = ImageFont.load_default()
 
-        # Calculate the required scale factor
-        scale_factor = desired_text_width / test_width
-        final_size = int(test_size * scale_factor)
-
-        # Create font with final size
-        font = ImageFont.truetype(available_font, size=final_size)
-
-    # Get final measurements
+    # Get text size
     bbox = draw.textbbox((0, 0), watermark_text, font=font)
     text_width = bbox[2] - bbox[0]
     text_height = bbox[3] - bbox[1]
 
-    # Calculate random position
-    padding = 10
+    logger.info(f"Text dimensions: {text_width}x{text_height} (target: {img_copy.width * text_width_ratio})")
+
+    # Calculate position with padding
+    padding = min(img_copy.width, img_copy.height) // 30  # Dynamic padding based on image size
     max_x = img_copy.width - text_width - padding
     max_y = img_copy.height - text_height - padding
 
@@ -207,7 +190,6 @@ def process_image(image_bytes, watermark_text, opacity, text_width_ratio, shadow
     output.seek(0)
 
     return output
-
 
 # Initialize post tracker
 post_tracker = PostTracker()
