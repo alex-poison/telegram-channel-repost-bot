@@ -4,3 +4,4 @@ python-dotenv==1.0.0
 pytz==2024.1
 SQLAlchemy==2.0.23
 apscheduler==3.10.4
+pillow==11.1.0

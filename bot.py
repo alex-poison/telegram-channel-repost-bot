@@ -9,13 +9,16 @@ from aiogram.types import BotCommand, Message
 from dotenv import load_dotenv
 import pytz
 from typing import Optional
-from io import TextIOWrapper
+from io import TextIOWrapper, BytesIO
+from PIL import Image, ImageDraw, ImageFont
+import random
+
 
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(levelname)s - %(name)s - %(funcName)s:%(lineno)d - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
@@ -66,6 +69,139 @@ class PostTracker:
     def update_last_post_time(self, time: datetime):
         """Update the time of last post"""
         self.last_post_time = time
+
+
+async def add_watermark_to_bytes(image_bytes, watermark_text, opacity=50, text_width_ratio=0.33, shadow_offset=3,
+                                 shadow_opacity=40):
+    """
+    Async function to add watermark to image bytes and return result as bytes.
+
+    Args:
+        image_bytes (bytes): Input image as bytes
+        watermark_text (str): Text to use as watermark
+        opacity (int): Opacity of main text (0-255)
+        text_width_ratio (float): Width of text relative to image width
+        shadow_offset (int): Shadow offset in pixels
+        shadow_opacity (int): Shadow opacity (0-255)
+
+    Returns:
+        BytesIO: Watermarked image as BytesIO object
+    """
+    try:
+        # Run PIL operations in a thread pool since they're CPU-bound
+        return await asyncio.get_event_loop().run_in_executor(
+            None,
+            process_image,
+            image_bytes,
+            watermark_text,
+            opacity,
+            text_width_ratio,
+            shadow_offset,
+            shadow_opacity
+        )
+    except Exception as e:
+        print(f"Error in add_watermark_to_bytes: {str(e)}")
+        raise e
+
+
+def process_image(image_bytes, watermark_text, opacity, text_width_ratio, shadow_offset, shadow_opacity):
+    """
+    Synchronous image processing function to be run in thread pool
+    """
+    # Open image from bytes
+    img = Image.open(BytesIO(image_bytes))
+
+    # Create copies to work with
+    img_copy = img.copy()
+    if img_copy.mode != 'RGBA':
+        img_copy = img_copy.convert('RGBA')
+
+    # Create a transparent overlay for watermark
+    watermark = Image.new('RGBA', img_copy.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(watermark)
+
+    # Calculate desired width of text
+    desired_text_width = int(img_copy.width * text_width_ratio)
+
+    # Test available fonts
+    available_font = None
+    font_paths = [
+        'arial.ttf',
+        '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+        '/System/Library/Fonts/Helvetica.ttc',  # macOS
+        'C:\\Windows\\Fonts\\arial.ttf',  # Windows
+        '/usr/share/fonts/TTF/DejaVuSans.ttf'  # Linux
+    ]
+
+    # Find first available font
+    for font_path in font_paths:
+        try:
+            test_font = ImageFont.truetype(font_path, size=20)
+            available_font = font_path
+            break
+        except:
+            continue
+
+    if not available_font:
+        default_font = ImageFont.load_default()
+        bbox = draw.textbbox((0, 0), watermark_text, font=default_font)
+        text_width = bbox[2] - bbox[0]
+        scale_factor = desired_text_width / text_width
+        font = default_font
+    else:
+        # Start with a reasonable size and measure
+        test_size = 100
+        font = ImageFont.truetype(available_font, size=test_size)
+        bbox = draw.textbbox((0, 0), watermark_text, font=font)
+        test_width = bbox[2] - bbox[0]
+
+        # Calculate the required scale factor
+        scale_factor = desired_text_width / test_width
+        final_size = int(test_size * scale_factor)
+
+        # Create font with final size
+        font = ImageFont.truetype(available_font, size=final_size)
+
+    # Get final measurements
+    bbox = draw.textbbox((0, 0), watermark_text, font=font)
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
+
+    # Calculate random position
+    padding = 10
+    max_x = img_copy.width - text_width - padding
+    max_y = img_copy.height - text_height - padding
+
+    if max_x < padding: max_x = padding
+    if max_y < padding: max_y = padding
+
+    x = random.randint(padding, max_x)
+    y = random.randint(padding, max_y)
+
+    # Draw the shadow
+    draw.text((x + shadow_offset, y + shadow_offset),
+              watermark_text,
+              font=font,
+              fill=(0, 0, 0, shadow_opacity))
+
+    # Draw the main text
+    draw.text((x, y),
+              watermark_text,
+              font=font,
+              fill=(255, 255, 255, opacity))
+
+    # Combine the original image with the watermark
+    watermarked = Image.alpha_composite(img_copy, watermark)
+
+    # Convert back to RGB
+    watermarked = watermarked.convert('RGB')
+
+    # Save to BytesIO object
+    output = BytesIO()
+    watermarked.save(output, format='JPEG', quality=95)
+    output.seek(0)
+
+    return output
 
 
 # Initialize post tracker
@@ -349,7 +485,37 @@ async def handle_media(message: Message):
 
         # Post immediately
         if media_type == "photo":
-            await bot.send_photo(chat_id=CHANNEL_ID, photo=media.file_id)
+            try:
+                # Download the photo
+                file = await bot.get_file(media.file_id)
+                photo_io = await bot.download_file(file.file_path)  # Changed from file.file_id to file.file_path
+                # Convert BinaryIO to bytes
+                photo_bytes = photo_io.read()
+
+                # Add watermark
+                watermarked = await add_watermark_to_bytes(
+                    photo_bytes,
+                    watermark_text="@TOOLOCAL",  # Change this to your watermark text
+                    opacity=128,
+                    text_width_ratio=0.33,
+                    shadow_offset=3,
+                    shadow_opacity=40
+                )
+
+                # Send watermarked photo using input_file
+                await bot.send_photo(
+                    chat_id=CHANNEL_ID,
+                    photo=types.BufferedInputFile(
+                        watermarked.getvalue(),
+                        filename="watermarked.jpg"
+                    ),
+                    caption=message.caption if message.caption else None
+                )
+            except Exception as e:
+                logger.error(f"Error processing photo watermark: {e}")
+                # Fallback to sending original photo if watermarking fails
+                await bot.send_photo(chat_id=CHANNEL_ID, photo=media.file_id)
+
         elif media_type == "video":
             await bot.send_video(chat_id=CHANNEL_ID, video=media.file_id)
         elif media_type == "animation":
@@ -365,7 +531,6 @@ async def handle_media(message: Message):
         elif media_type == "animation":
             await bot.send_animation(chat_id=CHANNEL_ID, animation=media.file_id)
 
-
         post_tracker.update_last_post_time(datetime.now(TIMEZONE))
         await message.reply("Message posted successfully.")
         await notify_main_admin(
@@ -376,7 +541,6 @@ async def handle_media(message: Message):
     except Exception as e:
         logger.error(f"Error processing message: {e}")
         await message.reply(f"Error processing your message: {str(e)}")
-
 
 @dp.message()
 async def handle_message(message: Message):
