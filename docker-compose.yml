@@ -3,7 +3,7 @@ services:
   bot:
     build: .
     volumes:
-      - ./data:/app/data
+      - ${PWD}/data:/app/data
     env_file:
       - .env
     restart: always

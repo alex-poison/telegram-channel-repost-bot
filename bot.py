@@ -126,11 +126,14 @@ def process_image(image_bytes, watermark_text, opacity, text_width_ratio, shadow
     # Test available fonts
     available_font = None
     font_paths = [
-        'arial.ttf',
-        '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
-        '/System/Library/Fonts/Helvetica.ttc',  # macOS
-        'C:\\Windows\\Fonts\\arial.ttf',  # Windows
-        '/usr/share/fonts/TTF/DejaVuSans.ttf'  # Linux
+        # Ubuntu Liberation fonts
+        '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
+        '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+        # Fallbacks (though we shouldn't need them in your case)
+        '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+        '/usr/share/fonts/truetype/ubuntu/Ubuntu-Bold.ttf',
+        '/System/Library/Fonts/Helvetica.ttc',
+        'C:\\Windows\\Fonts\\arial.ttf',
     ]
 
     # Find first available font
@@ -138,8 +141,10 @@ def process_image(image_bytes, watermark_text, opacity, text_width_ratio, shadow
         try:
             test_font = ImageFont.truetype(font_path, size=20)
             available_font = font_path
+            logger.info(f"Successfully loaded font: {font_path}")
             break
-        except:
+        except Exception as e:
+            logger.debug(f"Failed to load font {font_path}: {str(e)}")
             continue
 
     if not available_font:
