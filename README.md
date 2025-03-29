@@ -1,36 +1,55 @@
-# Telegram Channel Repost Bot
+# ChannelMaster: Telegram Content Management Bot
 
-A simple Telegram bot that allows authorized administrators to repost media content to a specific channel. Built with Python and aiogram.
+A powerful Telegram bot for managing content submissions, approval workflows, and channel publishing. Enables both direct admin posting and community-contributed content with moderation.
 
 ## Features
 
-- Multi-admin support with authorization system
-- Support for various media types:
-  - Photos
-  - Videos
-  - GIFs/Animations
-- Admin management commands
-- Main admin notifications about others' activities
-- Clean reposts (no forwarding metadata)
+### Admin Features
+- Multi-admin support with hierarchical permissions
+- Manage submissions from community members
+- Approve or reject suggested content with one click
+- Post directly to channel (bypassing approval workflow)
+- Admin notifications for important actions
+- Comprehensive statistics and management tools
+- Media group support (multiple photos/videos in one post)
 
-## Prerequisites
+### User Features
+- Submit content for channel publication
+- Receive notifications on submission approval/rejection
+- Track personal submission statistics
+- Fair rate limiting to prevent spam
 
-- Docker and Docker Compose (for Docker installation)
-- OR Python 3.11+ (for manual installation)
-- Telegram Bot Token from [@BotFather](https://t.me/BotFather)
-- Channel administrator rights for your bot
+### Media Support
+- Photos (with automatic watermarking)
+- Videos
+- GIFs/Animations
+- Documents
+- Audio files
+- Voice messages
+- Media groups/albums
 
-## Installation
+## New Commands
+
+### Admin Commands
+- All previous commands, plus:
+- `/pending` - View submissions awaiting approval
+- `/stats` - View submission statistics
+
+### User Commands
+- `/start` - Begin using the bot
+- `/help` - View available commands
+- `/status` - Check submission limits and statistics
+
+## Installation & Configuration
 
 ### Using Docker (recommended)
-
 1. Clone the repository:
 ```bash
-git clone https://github.com/TurboKach/telegram-channel-repost-bot.git
-cd telegram-channel-repost-bot
+git clone https://github.com/yourusername/channelmaster.git
+cd channelmaster
 ```
 
-2. Create `.env` file:
+2. Create `.env` file with your configuration:
 ```env
 BOT_TOKEN=your_bot_token
 CHANNEL_ID=your_channel_id
@@ -44,105 +63,31 @@ docker-compose up -d
 ```
 
 ### Manual Installation
+Follow the same steps as before, using the updated requirements.
 
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/telegram-channel-repost-bot.git
-cd telegram-channel-repost-bot
-```
+## Usage Workflow
 
-2. Install requirements:
-```bash
-pip install -r requirements.txt
-```
+### For Users
+1. Send media content to the bot
+2. Receive confirmation that submission is pending review
+3. Get notified when admins approve or reject your content
 
-3. Create `.env` file as shown above
-
-4. Run the bot:
-```bash
-python bot.py
-```
-
-## Configuration
-
-- `BOT_TOKEN`: Your Telegram bot token
-- `CHANNEL_ID`: ID of your Telegram channel (with minus sign if it's public)
-- `MAIN_ADMIN_ID`: Telegram user ID of the main administrator
-- `TIMEZONE`: Your timezone (default: UTC)
-
-## Commands
-
-### Main Admin Commands
-- `/add_admin USER_ID` - Add new administrator
-- `/remove_admin USER_ID` - Remove administrator
-- `/list_admins` - Show list of authorized administrators
-- `/last_post` - Check when the last post was made
-- `/help` - Show help message
-
-### Regular Admin Commands
-- `/last_post` - Check when the last post was made
-- `/help` - Show help message
-
-## Usage
-
-1. Add the bot as administrator to your channel
-2. Send or forward media (photos, videos, GIFs) to the bot
-3. Bot will post the media to your channel immediately
-4. Main admin will receive notifications about other admins' posts
+### For Admins
+1. Receive notifications about new submissions
+2. Review content with convenient approve/reject buttons
+3. Approved content is automatically posted to the channel
+4. Alternatively, send media directly to post immediately
 
 ## File Structure
 ```
 .
 ├── bot.py              # Main bot code
 ├── requirements.txt    # Python dependencies
-├── Dockerfile         # Docker configuration
-├── docker-compose.yml # Docker Compose configuration
-├── .env               # Environment variables
-└── admins.json        # Admins storage
+├── Dockerfile          # Docker configuration
+├── docker-compose.yml  # Docker Compose configuration
+├── .env                # Environment variables
+└── data/               # Data storage directory
+    ├── admins.json        # Admins list
+    ├── pending_posts.json # Pending submissions
+    └── user_limits.json   # User rate limits and stats
 ```
-
-## Dependencies
-
-- aiogram==3.15.0
-- python-dotenv==1.0.0
-- pytz==2024.1
-
-## Docker Volumes
-
-The bot uses a persistent volume for `admins.json` to maintain the list of authorized administrators across container restarts.
-
-## Docker Commands
-
-Start the bot:
-```bash
-docker-compose up -d
-```
-
-View logs:
-```bash
-docker-compose logs -f
-```
-
-Stop the bot:
-```bash
-docker-compose down
-```
-
-Update the bot:
-```bash
-docker-compose pull  # If using prebuilt image
-# or
-docker-compose up -d --build  # If building locally
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
