@@ -109,7 +109,7 @@ class PendingPostsManager:
 
     def add_pending_post(self, post_id: int, user_id: int, username: str, media_ids: List[str],
                          media_type: str, caption: Optional[str] = None,
-                         media_group_id: Optional[str] = None):
+                         media_group_id: Optional[str] = None, original_message_id: Optional[int] = None):
         """Add a new pending post"""
         self.pending_posts[post_id] = {
             "user_id": user_id,
@@ -119,6 +119,7 @@ class PendingPostsManager:
             "caption": caption,
             "timestamp": datetime.now(TIMEZONE).isoformat(),
             "media_group_id": media_group_id,
+            "original_message_id": original_message_id,  # Store the original message ID
             "status": "pending"  # pending, approved, rejected
         }
         self.save_pending_posts()
@@ -514,7 +515,6 @@ async def notify_admins(text: str, exclude_user_id: Optional[int] = None):
             logger.error(f"Failed to notify admin {admin_id}: {e}")
 
 
-# Callbacks to handle admin actions on suggestions
 @dp.callback_query(lambda c: c.data.startswith(('approve_', 'reject_')))
 async def process_suggestion_action(callback_query: types.CallbackQuery):
     if not is_authorized(callback_query.from_user.id):
@@ -536,6 +536,12 @@ async def process_suggestion_action(callback_query: types.CallbackQuery):
 
         user_id = post_data["user_id"]
         username = post_data["username"]
+        media_type = post_data["media_type"]
+        timestamp = datetime.fromisoformat(post_data["timestamp"])
+        submission_time = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+        media_ids = post_data["media_ids"]
+        caption = post_data["caption"]
+        media_group_id = post_data.get("media_group_id")
 
         # Get user info for notification
         admin_info = {
@@ -549,12 +555,6 @@ async def process_suggestion_action(callback_query: types.CallbackQuery):
 
             # Record this approved suggestion
             user_limits_manager.record_suggestion_result(user_id, True)
-
-            # Post to channel
-            media_type = post_data["media_type"]
-            media_ids = post_data["media_ids"]
-            caption = post_data["caption"]
-            media_group_id = post_data.get("media_group_id")
 
             # Handle different media types for posting to channel
             if media_type == "photo":
@@ -614,17 +614,34 @@ async def process_suggestion_action(callback_query: types.CallbackQuery):
             # Update last post time
             post_tracker.update_last_post_time(datetime.now(TIMEZONE))
 
-            # Notify user that their post was approved
+            # Notify user that their post was approved with specific details
             try:
-                await bot.send_message(
-                    user_id,
-                    f"✅ Your post has been approved and published to the channel!"
+                user_notification = (
+                    f"✅ Your {media_type} submitted on {submission_time} has been approved and published!\n\n"
                 )
+
+                if caption:
+                    # Include a preview of the caption to help identify the post
+                    caption_preview = caption[:50] + "..." if len(caption) > 50 else caption
+                    user_notification += f"Caption: \"{caption_preview}\""
+
+                # Find the original message ID that contained this submission
+                original_message_id = post_data.get("original_message_id")
+                if original_message_id:
+                    # Reply to the specific message
+                    await bot.send_message(
+                        user_id,
+                        user_notification,
+                        reply_to_message_id=original_message_id
+                    )
+                else:
+                    # Fallback if message ID not found
+                    await bot.send_message(user_id, user_notification)
             except Exception as e:
                 logger.error(f"Error notifying user {user_id} about approval: {e}")
 
-            # Notify admin about the action
-            action_msg = f"approved a post from user @{username} ({user_id})"
+            # Set action message for admin notification
+            action_msg = f"approved a {media_type} from user @{username} ({user_id})"
 
         else:  # Reject
             # Update post status
@@ -633,17 +650,34 @@ async def process_suggestion_action(callback_query: types.CallbackQuery):
             # Record this rejected suggestion
             user_limits_manager.record_suggestion_result(user_id, False)
 
-            # Notify user that their post was rejected
+            # Notify user that their post was rejected with specific details
             try:
-                await bot.send_message(
-                    user_id,
-                    f"❌ Your post has been reviewed but was not selected for publication."
+                user_notification = (
+                    f"❌ Your {media_type} submitted on {submission_time} was not selected for publication.\n\n"
                 )
+
+                if caption:
+                    # Include a preview of the caption to help identify the post
+                    caption_preview = caption[:50] + "..." if len(caption) > 50 else caption
+                    user_notification += f"Caption: \"{caption_preview}\""
+
+                # Find the original message ID that contained this submission
+                original_message_id = post_data.get("original_message_id")
+                if original_message_id:
+                    # Reply to the specific message
+                    await bot.send_message(
+                        user_id,
+                        user_notification,
+                        reply_to_message_id=original_message_id
+                    )
+                else:
+                    # Fallback if message ID not found
+                    await bot.send_message(user_id, user_notification)
             except Exception as e:
                 logger.error(f"Error notifying user {user_id} about rejection: {e}")
 
-            # Notify admin about the action
-            action_msg = f"rejected a post from user @{username} ({user_id})"
+            # Set action message for admin notification
+            action_msg = f"rejected a {media_type} from user @{username} ({user_id})"
 
         # Update callback message to show action taken
         await callback_query.message.edit_reply_markup(reply_markup=None)
@@ -1024,7 +1058,7 @@ async def status_command(message: Message):
 
 # Handler for media groups
 async def process_media_group(user_id: int, username: str, media_group_id: str,
-                              media_type: str, file_id: str, caption: Optional[str] = None):
+                              media_type: str, file_id: str, message_id: Optional[int] = None, caption: Optional[str] = None):
     """Process and collect media group items"""
     current_time = time.time()
 
@@ -1037,6 +1071,7 @@ async def process_media_group(user_id: int, username: str, media_group_id: str,
             "media_type": media_type,
             "caption": caption,
             "last_update": current_time,
+            "first_message_id": message_id,
             "complete": False
         }
 
@@ -1047,7 +1082,7 @@ async def process_media_group(user_id: int, username: str, media_group_id: str,
     # Update the last activity time
     media_group_collector[media_group_id]["last_update"] = current_time
 
-    # If there's a caption and we don't have one yet, save it
+    # If there's a caption, and we don't have one yet, save it
     if caption and not media_group_collector[media_group_id]["caption"]:
         media_group_collector[media_group_id]["caption"] = caption
 
@@ -1095,7 +1130,8 @@ async def handle_complete_media_group(media_group_id: str):
         media_ids=group_data["media_ids"],
         media_type=group_data["media_type"],
         caption=group_data["caption"],
-        media_group_id=media_group_id
+        media_group_id=media_group_id,
+        original_message_id=group_data.get("first_message_id")  # Add this line
     )
 
     # Notify user
@@ -1338,7 +1374,8 @@ async def handle_user_suggestion(message: Message):
             media_group_id=message.media_group_id,
             media_type=media_type,
             file_id=file_id,
-            caption=message.caption
+            caption=message.caption,
+            message_id=message.message_id
         )
 
         # If this is the first item in the group, inform user
@@ -1367,7 +1404,8 @@ async def handle_user_suggestion(message: Message):
         username=username,
         media_ids=[file_id],
         media_type=media_type,
-        caption=message.caption
+        caption=message.caption,
+        original_message_id=message.message_id  # Add this line
     )
 
     # Notify user
