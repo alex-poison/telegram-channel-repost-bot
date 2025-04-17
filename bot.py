@@ -1447,10 +1447,15 @@ async def main():
 
         # Start polling
         await dp.start_polling(bot)
-
+        
     except Exception as e:
         logger.error(f"Error in main: {e}")
 
-
+@dp.message_handler(content_types=types.ContentTypes.ANY)
+async def get_channel_id(msg: types.Message):
+    if msg.forward_from_chat:
+        await msg.answer(f"ID канала: <code>{msg.forward_from_chat.id}</code>")
+    else:
+        await msg.answer("Это не пересланное сообщение из канала")
 if __name__ == '__main__':
     asyncio.run(main())
