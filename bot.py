@@ -3,11 +3,9 @@ import logging
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-# Загрузка переменных окружения
+# Настройки из окружения
 API_TOKEN = os.getenv("BOT_TOKEN")
-MOD_CHAT_ID = int(os.getenv("MOD_CHAT_ID"))
 TARGET_CHANNEL = int(os.getenv("TARGET_CHANNEL"))
-WATCHED_CHANNELS = [int(cid) for cid in os.getenv("WATCHED_CHANNELS", "-1009999999999").split(",")]
 ADMINS = [int(uid) for uid in os.getenv("ADMINS", "").split(",")]
 
 logging.basicConfig(level=logging.INFO)
@@ -15,54 +13,44 @@ bot = Bot(token=API_TOKEN, parse_mode=types.ParseMode.HTML)
 dp = Dispatcher(bot)
 
 
-# Временная функция — получить ID канала через пересылку
-@dp.message_handler(content_types=types.ContentTypes.ANY)
-async def get_channel_id(msg: types.Message):
-    if msg.forward_from_chat:
-        await msg.answer(f"ID канала: <code>{msg.forward_from_chat.id}</code>")
-    else:
-        await msg.answer("Это не пересланное сообщение из канала")
-
-
-# Генерация кнопок модерации
-def get_moderation_keyboard(original_chat_id, original_msg_id):
+# Генерация кнопок под каждым постом от Telethon
+def get_manual_keyboard(message_id):
     keyboard = InlineKeyboardMarkup()
     keyboard.add(
-        InlineKeyboardButton("✅ Пост", callback_data=f"post:{original_chat_id}:{original_msg_id}"),
-        InlineKeyboardButton("❌ Пропустить", callback_data=f"skip:{original_chat_id}:{original_msg_id}")
+        InlineKeyboardButton("✅ Пост", callback_data=f"post_manual:{message_id}"),
+        InlineKeyboardButton("❌ Пропустить", callback_data=f"skip_manual:{message_id}")
     )
     return keyboard
 
 
-# Обработка новых сообщений из отслеживаемых каналов
-@dp.channel_post_handler(lambda message: message.chat.id in WATCHED_CHANNELS)
-async def handle_channel_post(message: types.Message):
-    await bot.copy_message(
-        chat_id=MOD_CHAT_ID,
-        from_chat_id=message.chat.id,
-        message_id=message.message_id,
-        reply_markup=get_moderation_keyboard(message.chat.id, message.message_id)
-    )
+# Хендлер: входящее сообщение от Telethon
+@dp.message_handler(content_types=types.ContentTypes.ANY)
+async def handle_telethon_message(message: types.Message):
+    # Если пишет не админ — игнор
+    if message.from_user.id not in ADMINS:
+        return
+
+    # Отвечаем на сообщение кнопками модерации
+    await message.reply("Сообщение от Telethon", reply_markup=get_manual_keyboard(message.message_id))
 
 
-# Обработка кнопок модерации
-@dp.callback_query_handler(lambda c: c.data.startswith("post") or c.data.startswith("skip"))
-async def handle_callback(callback: types.CallbackQuery):
-    action, channel_id, msg_id = callback.data.split(":")
-    channel_id = int(channel_id)
+# Хендлер: обработка кнопок ✅ ❌
+@dp.callback_query_handler(lambda c: c.data.startswith("post_manual") or c.data.startswith("skip_manual"))
+async def handle_manual_buttons(callback: types.CallbackQuery):
+    action, msg_id = callback.data.split(":")
     msg_id = int(msg_id)
 
-    if action == "post":
+    if action == "post_manual":
         try:
             await bot.copy_message(
                 chat_id=TARGET_CHANNEL,
-                from_chat_id=channel_id,
-                message_id=msg_id
+                from_chat_id=callback.message.chat.id,
+                message_id=callback.message.reply_to_message.message_id
             )
             await callback.message.edit_text("✅ Опубликовано")
         except Exception as e:
             await callback.message.edit_text(f"Ошибка: {e}")
-    elif action == "skip":
+    elif action == "skip_manual":
         await callback.message.edit_text("❌ Пропущено")
 
     await callback.answer()
