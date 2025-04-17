@@ -3,7 +3,7 @@ import logging
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-# Настройки из окружения
+# Настройки
 API_TOKEN = os.getenv("BOT_TOKEN")
 TARGET_CHANNEL = int(os.getenv("TARGET_CHANNEL"))
 ADMINS = [int(uid) for uid in os.getenv("ADMINS", "").split(",")]
@@ -13,7 +13,7 @@ bot = Bot(token=API_TOKEN, parse_mode=types.ParseMode.HTML)
 dp = Dispatcher(bot)
 
 
-# Генерация кнопок под каждым постом от Telethon
+# Кнопки модерации
 def get_manual_keyboard(message_id):
     keyboard = InlineKeyboardMarkup()
     keyboard.add(
@@ -23,18 +23,17 @@ def get_manual_keyboard(message_id):
     return keyboard
 
 
-# Хендлер: входящее сообщение от Telethon
+# Приём сообщений от Telethon (текст, фото, видео, документы и т.п.)
 @dp.message_handler(content_types=types.ContentTypes.ANY)
 async def handle_telethon_message(message: types.Message):
-    # Если пишет не админ — игнор
-    if message.from_user.id not in ADMINS:
-        return
+    print(f"[DEBUG] Получено сообщение {message.message_id} | from_user: {message.from_user}")
+    try:
+        await message.reply("Сообщение от Telethon:", reply_markup=get_manual_keyboard(message.message_id))
+    except Exception as e:
+        print(f"[ОШИБКА] Не удалось прикрепить кнопки: {e}")
 
-    # Отвечаем на сообщение кнопками модерации
-    await message.reply("Сообщение от Telethon", reply_markup=get_manual_keyboard(message.message_id))
 
-
-# Хендлер: обработка кнопок ✅ ❌
+# Обработка кнопок ✅ / ❌
 @dp.callback_query_handler(lambda c: c.data.startswith("post_manual") or c.data.startswith("skip_manual"))
 async def handle_manual_buttons(callback: types.CallbackQuery):
     action, msg_id = callback.data.split(":")
