@@ -4,7 +4,6 @@ services:
     env: python
     buildCommand: ""
     startCommand: python bot.py
-    region: oregon
     plan: free
     envVars:
       - key: BOT_TOKEN
