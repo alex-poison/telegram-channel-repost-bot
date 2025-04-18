@@ -1,7 +1,7 @@
 import os
 import logging
 from aiogram import Bot, Dispatcher, executor, types
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto, InputMediaVideo
 from aiogram.dispatcher.filters import Text
 
 API_TOKEN = os.getenv("BOT_TOKEN")
@@ -13,7 +13,6 @@ bot = Bot(token=API_TOKEN, parse_mode=types.ParseMode.HTML)
 dp = Dispatcher(bot)
 
 # ✨ Удаляет последнюю строку, если там есть ссылка или хэштег
-
 def clean_signature(text: str) -> str:
     lines = text.strip().split('\n')
     if len(lines) < 2:
@@ -25,7 +24,6 @@ def clean_signature(text: str) -> str:
     return text
 
 # 📌 Кнопки
-
 def get_manual_keyboard(message_id):
     kb = InlineKeyboardMarkup()
     kb.add(
@@ -34,12 +32,47 @@ def get_manual_keyboard(message_id):
     )
     return kb
 
+# Временное хранилище медиа-групп
+media_groups = {}
+
 # 📩 Приём сообщений от Telethon
 @dp.message_handler(content_types=types.ContentTypes.ANY)
 async def handle_telethon_message(msg: types.Message):
-    await msg.reply("Сообщение от Telethon:", reply_markup=get_manual_keyboard(msg.message_id))
+    print(f"➡️ Получено сообщение: {msg.text or msg.caption}")
+    kb = get_manual_keyboard(msg.message_id)
 
-# ✅ Побликация
+    # Обработка альбомов
+    if msg.media_group_id:
+        group = media_groups.setdefault(msg.media_group_id, [])
+        group.append(msg)
+
+        await asyncio.sleep(1.0)  # Подождать, пока соберутся все части
+        if len(group) > 1:
+            media = []
+            for m in group:
+                if m.photo:
+                    media.append(InputMediaPhoto(media=m.photo[-1].file_id, caption=m.caption if len(media) == 0 else None))
+                elif m.video:
+                    media.append(InputMediaVideo(media=m.video.file_id, caption=m.caption if len(media) == 0 else None))
+            if media:
+                sent = await bot.send_media_group(chat_id=msg.chat.id, media=media)
+                await bot.send_message(chat_id=msg.chat.id, text="Модерация альбома:", reply_markup=kb, reply_to_message_id=sent[0].message_id)
+            media_groups.pop(msg.media_group_id, None)
+        return
+
+    # Обычные сообщения
+    if msg.photo:
+        await bot.send_photo(chat_id=msg.chat.id, photo=msg.photo[-1].file_id, caption=msg.caption, reply_markup=kb)
+    elif msg.video:
+        await bot.send_video(chat_id=msg.chat.id, video=msg.video.file_id, caption=msg.caption, reply_markup=kb)
+    elif msg.document:
+        await bot.send_document(chat_id=msg.chat.id, document=msg.document.file_id, caption=msg.caption, reply_markup=kb)
+    elif msg.text:
+        await bot.send_message(chat_id=msg.chat.id, text=msg.text, reply_markup=kb)
+    else:
+        await msg.reply("❌ Неподдерживаемый формат.")
+
+# ✅ Публикация
 @dp.callback_query_handler(Text(startswith="post_manual"))
 async def post_message(callback: types.CallbackQuery):
     msg_id = int(callback.data.split(":")[1])
@@ -73,4 +106,4 @@ async def skip_post(callback: types.CallbackQuery):
     await callback.answer()
 
 if __name__ == '__main__':
-    executor.start_polling(dp, skip_updates=True)
+    executor.start_polling(dp, skip_updates=False)
