@@ -1,0 +1,15 @@
+services:
+  - type: worker
+    name: telegram-channel-repost-bot
+    env: python
+    buildCommand: ""
+    startCommand: python bot.py
+    region: oregon
+    plan: free
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: TARGET_CHANNEL
+        sync: false
+      - key: ADMINS
+        sync: false
